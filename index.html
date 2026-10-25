@@ -773,7 +773,7 @@ function seed(){
  M('c4','out','u1',1995,'Елена, конечно! Сняла для вас короткий обзор образцов при дневном и тёплом свете.');
  M('c4','out','u1',1994,'',{att:[A_VID('Образцы_эмаль_свет.mp4',47)],status:'read'});
  M('c4','in',null,240,'О, теперь видно разницу. Склоняюсь к графиту. Пришлите фото фасада крупнее?');
- M('c4','out','u1',236,'Держите макро графитовой эмали с латунной ручкой:',{att:[A_IMG('Графит_эмаль_макро.jpg',640000,PIC('Графит + латунь','Эмаль софт-тач, ручка латунь','#1f2937','#b8860b','✨')]),status:'read'});
+ M('c4','out','u1',236,'Держите макро графитовой эмали с латунной ручкой:',{att:[A_IMG('Графит_эмаль_макро.jpg',640000,PIC('Графит + латунь','Эмаль софт-тач, ручка латунь','#1f2937','#b8860b','✨'))],status:'read'});
  M('c4','in',null,238,'Красиво. Думаю до выходных и возвращаюсь к вам.');
  /* c5 — Тимур, WhatsApp */
  M('c5','in',null,4000,'Дмитрий, добрый день. Договор по гостиной подписали, когда счёт?');
@@ -1100,7 +1100,7 @@ function renderRail(){
   <div class="navsec">${items.map(([id,lb,ic,bd])=>`<button class="nv ${UI.section===id?'on':''}" data-sec="${id}">${I(ic)}<span>${lb}</span>${bd?`<span class="bd ${id==='tasks'&&TaskService.overdue().length?'warn':''}">${bd}</span>`:''}</button>`).join('')}</div>
   <div class="rail-foot">
    <div class="rail-tools">
-    <button data-bell title="Уведомления">${I('bell')}<span>Центр</span></button>
+    <button data-bell title="Уведомления" style="position:relative">${I('bell')}<span>Центр</span><span class="bd" id="bellBadge" style="position:absolute;top:2px;right:2px;display:none"></span></button>
     <button id="themeBtn" title="Тема">${I(state.theme==='dark'?'sun':'moon')}<span>Тема</span></button>
    </div>
    <div id="userSwitch">${avatarHTML(me.name,'sm')}<div class="ut"><div class="nm">${esc(me.name.split(' ')[0])}</div><div class="rl">${me.role==='lead'?'Руководитель':me.role==='admin'?'Администратор':'Менеджер'}</div></div><span class="chev">${I('chevD')}</span></div>
@@ -2131,7 +2131,7 @@ function renderSettings(root){
  </div>`;
  $('#stSaveP').onclick=()=>{me.name=$('#stName').value||me.name;me.phone=$('#stPhone').value||me.phone;saveSoon();renderRail();Toast.ok('Профиль сохранён','Имя и рабочий номер обновлены')};
  $('#stTheme').onclick=()=>App.toggleTheme();
- $('#stOff').onclick=()=>{state.simOffline=!state.simOffline;saveSoon();setOffline();e=>0;renderSettings(root)};
+ $('#stOff').onclick=()=>{state.simOffline=!state.simOffline;saveSoon();setOffline();renderSettings(root)};
  $$('#view [data-sw]').forEach(b=>b.onclick=()=>{s[b.dataset.sw]=!s[b.dataset.sw];b.classList.toggle('on');saveSoon();Toast.ok('Настройка сохранена')});
  $('#stSla').onchange=e=>{s.slaHours=+e.target.value;saveSoon();renderDList&&renderDList();Toast.ok('SLA обновлён',s.slaHours+' часа')};
  $$('#view [data-role]').forEach(sel=>sel.onchange=()=>{const u=UserService.byId(sel.dataset.role);u.role=sel.value;saveSoon();Toast.ok('Роль обновлена',u.name+' — '+sel.options[sel.selectedIndex].text)});
