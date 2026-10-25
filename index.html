@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>OmniChat: WA, TG, Max</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#111827"> <!-- Tailwind gray-900 -->
+    <link rel="apple-touch-icon" href="https://placehold.co/180x180/2563eb/ffffff?text=O">
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --wa-color: #25D366;
+            --tg-color: #2AABEE;
+            --max-color: #0077FF;
+            --safe-area-top: env(safe-area-inset-top, 0px);
+            --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827; /* gray-900 */
+            color: #f3f4f6; /* gray-100 */
+            overscroll-behavior-y: none; /* Предотвращает pull-to-refresh на мобильных */
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Адаптивный Layout */
+        #app {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            padding-top: var(--safe-area-top);
+        }
+
+        #sidebar {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            background-color: #111827;
+            border-right: 1px solid #374151; /* gray-700 */
+            z-index: 10;
+        }
+
+        #chat-view {
+            position: absolute;
+            top: var(--safe-area-top);
+            left: 0;
+            width: 100%;
+            height: calc(100% - var(--safe-area-top));
+            background-color: #0f172a; /* slate-900 */
+            transform: translateX(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #chat-view.active {
+            transform: translateX(0);
+        }
+
+        /* Десктопный вид */
+        @media (min-width: 768px) {
+            #sidebar {
+                width: 380px;
+                flex-shrink: 0;
+            }
+            #chat-view {
+                position: relative;
+                top: 0;
+                transform: translateX(0);
+                flex: 1;
+                height: 100%;
+                z-index: 1;
+            }
+            .mobile-back-btn {
+                display: none !important;
+            }
+        }
+
+        /* Стили скроллбара */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 10px;
+        }
+
+        /* Сообщения */
+        .msg-bubble {
+            max-width: 85%;
+            word-wrap: break-word;
+            position: relative;
+        }
+        
+        .msg-sent {
+            background-color: #3b82f6; /* blue-500 */
+            border-bottom-right-radius: 4px;
+        }
+        
+        .msg-received {
+            background-color: #374151; /* gray-700 */
+            border-bottom-left-radius: 4px;
+        }
+
+        /* Меню действий с сообщением */
+        .msg-actions-menu {
+            display: none;
+            position: absolute;
+            bottom: -40px;
+            right: 0;
+            background: #1f2937;
+            border: 1px solid #374151;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            z-index: 50;
+            overflow: hidden;
+        }
+        .msg-actions-menu.show {
+            display: flex;
+            flex-direction: row;
+        }
+        .msg-action-btn {
+            padding: 8px 12px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .msg-action-btn:hover {
+            background: #374151;
+        }
+
+        .source-icon {
+            position: absolute;
+            bottom: -2px;
+            right: -2px;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: white;
+            border: 2px solid #111827;
+        }
+        
+        .bg-wa { background-color: var(--wa-color); }
+        .bg-tg { background-color: var(--tg-color); }
+        .bg-max { background-color: var(--max-color); }
+
+        .chat-item {
+            transition: background-color 0.2s;
+        }
+        .chat-item:active, .chat-item.selected {
+            background-color: #1f2937; /* gray-800 */
+        }
+        
+        #input-container {
+            padding-bottom: calc(16px + var(--safe-area-bottom));
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app">
+        <!-- СПИСОК ЧАТОВ -->
+        <div id="sidebar">
+            <div class="px-4 py-5 border-b border-gray-800 flex justify-between items-center bg-gray-900">
+                <h1 class="text-xl font-semibold">Входящие</h1>
+                <button class="text-gray-400 hover:text-white"><i class="fa-solid fa-magnifying-glass"></i></button>
+            </div>
+            
+            <!-- Фильтры (Опционально для вида) -->
+            <div class="flex gap-2 px-4 py-3 border-b border-gray-800 overflow-x-auto">
+                <span class="px-3 py-1 bg-blue-600 rounded-full text-xs font-medium cursor-pointer">Все</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs font-medium cursor-pointer flex items-center gap-1"><i class="fa-brands fa-whatsapp text-[#25D366]"></i> WhatsApp</span>
+                <span class="px-3 py-1 bg-gray-800 rounded-full text-xs font-medium cursor-pointer flex items-center gap-1"><i class="fa-brands fa-telegram text-[#2AABEE]"></i> Telegram</span>
+            </div>
+
+            <div id="chat-list" class="flex-1 overflow-y-auto">
+                <!-- Чаты генерируются через JS -->
+            </div>
+        </div>
+
+        <!-- ОКНО ДИАЛОГА -->
+        <div id="chat-view">
+            <!-- Шапка чата -->
+            <div class="h-16 border-b border-gray-800 flex items-center px-4 bg-gray-900 shadow-sm shrink-0">
+                <button id="btn-back" class="mobile-back-btn mr-3 text-blue-500 p-2 -ml-2 rounded-full hover:bg-gray-800">
+                    <i class="fa-solid fa-chevron-left text-lg"></i>
+                </button>
+                
+                <div class="flex items-center flex-1 min-w-0" id="chat-header-info">
+                    <!-- Заполняется JS -->
+                </div>
+                
+                <button class="text-gray-400 hover:text-white p-2"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+            </div>
+
+            <!-- Область сообщений -->
+            <div id="messages-container" class="flex-1 overflow-y-auto p-4 flex flex-col gap-4 bg-[#0f172a]">
+                <!-- Сообщения генерируются через JS -->
+            </div>
+
+            <!-- Ввод сообщения -->
+            <div id="input-container" class="bg-gray-900 border-t border-gray-800 px-4 pt-3 flex items-end gap-2 shrink-0">
+                <button class="text-gray-400 hover:text-white p-3 rounded-full hover:bg-gray-800 transition mb-1 shrink-0">
+                    <i class="fa-solid fa-paperclip text-xl"></i>
+                </button>
+                
+                <div class="flex-1 bg-gray-800 rounded-2xl border border-gray-700 focus-within:border-blue-500 overflow-hidden mb-1 flex items-end min-h-[44px]">
+                    <textarea id="msg-input" rows="1" placeholder="Сообщение..." class="w-full bg-transparent text-white px-4 py-3 outline-none resize-none max-h-32" style="min-height: 44px;"></textarea>
+                </div>
+                
+                <button id="btn-send" class="bg-blue-600 text-white p-3 rounded-full hover:bg-blue-700 transition shadow-lg mb-1 shrink-0 h-11 w-11 flex items-center justify-center">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Mock Data ---
+        const mockChats = [
+            { id: 1, name: 'Алексей (Лид с сайта)', phone: '+7 999 123-45-67', lastMsg: 'Хорошо, давайте оформим', time: '14:32', unread: 2, source: 'whatsapp', avatar: 'https://placehold.co/150x150/1e293b/ffffff?text=А' },
+            { id: 2, name: 'Мария В.', phone: '@mary_v', lastMsg: 'А доставка бесплатная?', time: '12:15', unread: 0, source: 'telegram', avatar: 'https://placehold.co/150x150/334155/ffffff?text=М' },
+            { id: 3, name: 'Иван Петров', phone: 'vk.com/ivan_p', lastMsg: 'Спасибо, получил файл.', time: 'Вчера', unread: 0, source: 'max', avatar: 'https://placehold.co/150x150/0f172a/ffffff?text=И' },
+            { id: 4, name: 'Елена (Опт)', phone: '+7 900 000-00-00', lastMsg: 'Жду счет на оплату', time: 'Вчера', unread: 0, source: 'whatsapp', avatar: 'https://placehold.co/150x150/1e293b/ffffff?text=Е' },
+        ];
+
+        const mockMessages = {
+            1: [
+                { id: 101, text: 'Здравствуйте, Алексей! Вы оставляли заявку на нашем сайте.', sender: 'me', time: '14:20' },
+                { id: 102, text: 'Да, добрый день. Интересует интеграция.', sender: 'them', time: '14:25' },
+                { id: 103, text: 'Можем предложить два варианта. Отправить презентацию?', sender: 'me', time: '14:27' },
+                { id: 104, text: 'Да, отправьте.', sender: 'them', time: '14:30' },
+                { id: 105, text: 'Хорошо, давайте оформим', sender: 'them', time: '14:32' },
+            ],
+            2: [
+                { id: 201, text: 'Подскажите по наличию товара', sender: 'them', time: '12:00' },
+                { id: 202, text: 'Добрый день, товар в наличии на складе.', sender: 'me', time: '12:05' },
+                { id: 203, text: 'А доставка бесплатная?', sender: 'them', time: '12:15' }
+            ]
+        };
+
+        // --- Utils ---
+        function getSourceIcon(source) {
+            switch(source) {
+                case 'whatsapp': return '<div class="source-icon bg-wa"><i class="fa-brands fa-whatsapp"></i></div>';
+                case 'telegram': return '<div class="source-icon bg-tg"><i class="fa-brands fa-telegram"></i></div>';
+                case 'max': return '<div class="source-icon bg-max"><i class="fa-solid fa-comment-dots"></i></div>';
+                default: return '';
+            }
+        }
+
+        // --- DOM Elements ---
+        const chatListEl = document.getElementById('chat-list');
+        const chatViewEl = document.getElementById('chat-view');
+        const btnBack = document.getElementById('btn-back');
+        const messagesContainer = document.getElementById('messages-container');
+        const chatHeaderInfo = document.getElementById('chat-header-info');
+        const msgInput = document.getElementById('msg-input');
+        const btnSend = document.getElementById('btn-send');
+
+        let activeChatId = null;
+
+        // --- Render Functions ---
+        function renderChatList() {
+            chatListEl.innerHTML = '';
+            mockChats.forEach(chat => {
+                const isSelected = chat.id === activeChatId ? 'selected' : '';
+                const unreadBadge = chat.unread > 0 ? `<div class="bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full mt-1">${chat.unread}</div>` : '';
+                
+                const html = `
+                    <div class="chat-item flex items-center p-4 border-b border-gray-800 cursor-pointer ${isSelected}" onclick="openChat(${chat.id})">
+                        <div class="relative mr-4 shrink-0">
+                            <img src="${chat.avatar}" alt="avatar" class="w-12 h-12 rounded-full object-cover">
+                            ${getSourceIcon(chat.source)}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex justify-between items-baseline mb-1">
+                                <h3 class="text-white font-medium truncate pr-2">${chat.name}</h3>
+                                <span class="text-xs text-gray-500 shrink-0">${chat.time}</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <p class="text-sm text-gray-400 truncate pr-2">${chat.lastMsg}</p>
+                                ${unreadBadge}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                chatListEl.insertAdjacentHTML('beforeend', html);
+            });
+        }
+
+        function renderMessages(chatId) {
+            messagesContainer.innerHTML = '';
+            const msgs = mockMessages[chatId] || [];
+            
+            if (msgs.length === 0) {
+                messagesContainer.innerHTML = '<div class="text-center text-gray-500 mt-10 text-sm">Нет сообщений</div>';
+                return;
+            }
+
+            msgs.forEach(msg => {
+                const isMe = msg.sender === 'me';
+                const alignClass = isMe ? 'self-end' : 'self-start';
+                const bubbleClass = isMe ? 'msg-sent text-white' : 'msg-received text-gray-100';
+                const menuHtml = isMe ? `
+                    <div class="msg-actions-menu" id="menu-${msg.id}">
+                        <div class="msg-action-btn text-gray-200" onclick="editMessage(${msg.id})"><i class="fa-solid fa-pen mr-2"></i>Изменить</div>
+                        <div class="msg-action-btn text-red-400" onclick="deleteMessage(${msg.id})"><i class="fa-solid fa-trash mr-2"></i>Удалить</div>
+                    </div>
+                ` : '';
+
+                const html = `
+                    <div class="${alignClass} msg-bubble ${bubbleClass} px-4 py-2 rounded-2xl shadow-sm text-[15px] cursor-pointer" onclick="toggleMenu(${msg.id}, ${isMe})">
+                        ${msg.text}
+                        <div class="text-[10px] text-opacity-70 mt-1 text-right ${isMe ? 'text-blue-100' : 'text-gray-400'}">${msg.time} ${isMe ? '<i class="fa-solid fa-check-double ml-1"></i>' : ''}</div>
+                        ${menuHtml}
+                    </div>
+                `;
+                messagesContainer.insertAdjacentHTML('beforeend', html);
+            });
+            
+            // Scroll to bottom
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function renderChatHeader(chatId) {
+            const chat = mockChats.find(c => c.id === chatId);
+            if (!chat) return;
+            
+            let iconClass = '';
+            if(chat.source === 'whatsapp') iconClass = 'fa-whatsapp text-[#25D366]';
+            if(chat.source === 'telegram') iconClass = 'fa-telegram text-[#2AABEE]';
+            if(chat.source === 'max') iconClass = 'fa-comment-dots text-[#0077FF]';
+
+            chatHeaderInfo.innerHTML = `
+                <div class="relative mr-3 shrink-0">
+                    <img src="${chat.avatar}" alt="avatar" class="w-10 h-10 rounded-full object-cover">
+                </div>
+                <div class="flex-1 min-w-0">
+                    <h2 class="text-white font-medium text-base truncate">${chat.name}</h2>
+                    <p class="text-xs text-gray-400 truncate flex items-center gap-1">
+                        <i class="fa-brands ${iconClass}"></i> ${chat.phone}
+                    </p>
+                </div>
+            `;
+        }
+
+        // --- Interactions ---
+        window.openChat = function(chatId) {
+            activeChatId = chatId;
+            
+            // Сброс бейджа непрочитанных (для мока)
+            const chat = mockChats.find(c => c.id === chatId);
+            if (chat) chat.unread = 0;
+
+            renderChatList();
+            renderChatHeader(chatId);
+            renderMessages(chatId);
+            
+            // Slide in animation for mobile
+            chatViewEl.classList.add('active');
+        };
+
+        btnBack.addEventListener('click', () => {
+            chatViewEl.classList.remove('active');
+            activeChatId = null;
+            renderChatList();
+        });
+
+        // Auto-resize textarea
+        msgInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+
+        // Send Message
+        function sendMessage() {
+            const text = msgInput.value.trim();
+            if (!text || !activeChatId) return;
+
+            const now = new Date();
+            const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+            if (!mockMessages[activeChatId]) {
+                mockMessages[activeChatId] = [];
+            }
+
+            mockMessages[activeChatId].push({
+                id: Date.now(),
+                text: text,
+                sender: 'me',
+                time: timeStr
+            });
+
+            // Update chat list last message
+            const chat = mockChats.find(c => c.id === activeChatId);
+            if(chat) {
+                chat.lastMsg = text;
+                chat.time = timeStr;
+            }
+
+            msgInput.value = '';
+            msgInput.style.height = 'auto';
+            
+            renderMessages(activeChatId);
+            renderChatList();
+        }
+
+        btnSend.addEventListener('click', sendMessage);
+        msgInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Message Actions (Edit/Delete)
+        window.toggleMenu = function(msgId, isMe) {
+            if(!isMe) return; // Меню только для своих сообщений
+            
+            // Скрываем все остальные открытые меню
+            document.querySelectorAll('.msg-actions-menu.show').forEach(el => {
+                if(el.id !== `menu-${msgId}`) el.classList.remove('show');
+            });
+
+            const menu = document.getElementById(`menu-${msgId}`);
+            if(menu) menu.classList.toggle('show');
+        };
+
+        window.deleteMessage = function(msgId) {
+            if(!activeChatId) return;
+            mockMessages[activeChatId] = mockMessages[activeChatId].filter(m => m.id !== msgId);
+            renderMessages(activeChatId);
+        };
+
+        window.editMessage = function(msgId) {
+            if(!activeChatId) return;
+            const msg = mockMessages[activeChatId].find(m => m.id === msgId);
+            if(msg) {
+                msgInput.value = msg.text;
+                msgInput.focus();
+                // В реальном приложении здесь должна быть логика переключения кнопки Send в режим Save
+                deleteMessage(msgId); // Для мока просто удаляем старое, чтобы при отправке создалось новое
+            }
+        };
+
+        // Закрытие меню при клике вне сообщения
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.msg-bubble')) {
+                document.querySelectorAll('.msg-actions-menu.show').forEach(el => el.classList.remove('show'));
+            }
+        });
+
+        // Init
+        renderChatList();
+        // На десктопе сразу открываем первый чат
+        if (window.innerWidth >= 768) {
+            openChat(1);
+        }
+
+    </script>
+</body>
+</html>
